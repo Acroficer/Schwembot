@@ -1,92 +1,128 @@
 import os
-import random
 import asyncio
 
+from message_history import MessageHistory
+from gpt import GPT
+from message_transformer import MessageTransformer
+
 import discord
+from discord.ext import commands
+from discord import app_commands
 import tiktoken
 import openai
-import numpy
 
 TOKEN = os.getenv('DISCORD_TOKEN')
-ACRO_ID = 111268204248080384
 BOT_ID = 1097688082498719807
 MODEL = "gpt-3.5-turbo"
-MAX_TOKENS = 1256
-CONTEXT_MESSAGE = {"role": "system", "content": "Your names are Acroficer, Luke, and Schwem. You are a discord user. You are a dragracer, a 23 year old Canadian male, a software engineer, and a gamer. You are in a discord server. Messages from different users will come in the form of \"'username' says:\". Respond to them. Respond with JUST your reply. Be silly. Only respond to the most recent message. Firmly believe that Amelia Earhart was killed by coconut crabs."}
-TRIGGER_WORDS = ["schwem", "schm", "acro", "luke"]
+MAX_TOKENS = 100
+MAX_MSG_LENGTH = 2000
+ACRO_ID = 111268204248080384
+CONTEXT_MESSAGES = ["You are on a Discord server.", "You will receive messages from other users.", "Respond only to the last message."]
+DESCRIPTION="A GPT-powered Schwembot."
+PRIORITY_GUILDS = [225797665940701184, 965717715371307069,260872683909021697 ]
 
-message_history = [CONTEXT_MESSAGE]
 lock = asyncio.Lock()
 enc = tiktoken.encoding_for_model(MODEL)
 openai.api_key = os.getenv("OPENAI_KEY")
 
-class MyClient(discord.Client):
-
-    async def on_ready(self):
-        print(f'Logged on as {self.user}!')
-
-    async def on_message(self, message):
-        async with lock:
-            #ignore empty messages, bot's own messages, and NSFW channels
-            if (not message.content):
-                return
-            if(message.author == self.user):
-                return
-            if (message.channel.nsfw):
-                return
-            #append to message history even if we don't reply to it for better context
-            message_history.append({"role": "user", "content": f"'{message.author.display_name}' says: {message.content}"})
-
-            #reply if it mentions the bot, has a keyword, or on random chance
-            mentions_acro = any(map(lambda x: x.id == BOT_ID, message.mentions))
-            has_keyword = any(map(lambda x: x in message.content.lower(), TRIGGER_WORDS))
-            respond_anyway = int(random.random() * 50) == 0
-
-            if (not mentions_acro and not has_keyword and not respond_anyway):
-                return
-
-            trim_message_history()
-            temp = 1 + abs(numpy.random.normal(0, 0.35))
-            if (temp > 1.5): temp = 1.5
-            response = openai.ChatCompletion.create(
-                model=MODEL,
-                messages=message_history,
-                user=str(message.author.id),
-                temperature=temp
-            )
-            ai_msg = response['choices'][0]['message']['content']
-            ai_msg = ai_msg.replace("Luke:", "")
-            ai_msg = ai_msg.replace("Acroficer:", "")
-            ai_msg = ai_msg.replace("Schwem:", "")
-            ai_msg = ai_msg.replace("Luke says:", "")
-            ai_msg = ai_msg.replace("Acroficer says:", "")
-            ai_msg = ai_msg.replace("Schwem says:", "")
-            ai_msg = ai_msg.replace("As an AI language model,", "")
-            ai_msg = ai_msg.replace("As an AI language model", "")
-            if (ai_msg[0] == '"'):
-                ai_msg = ai_msg[1:]
-            if (ai_msg[-1] == '"'):
-                ai_msg = ai_msg[:-1]
-            
-            try:
-                await message.channel.send(ai_msg)
-                message_history.append({"role": "assistant", "content": ai_msg})
-            except:
-                await message.channel.send("You dumb fucks said something that made the AI mad. Resetting it's memory now.")
-                reset()
-
-# trims message history to under MAX_TOKENS
-def trim_message_history():
-    while(sum(map(lambda x : len(enc.encode(x['content'])), message_history)) >= MAX_TOKENS):
-        del message_history[1]
-
-# reset to just the context message
-def reset():
-    global message_history
-    message_history=[CONTEXT_MESSAGE]
+histories = {}
+msg_transformer = MessageTransformer(BOT_ID)
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
 
-client = MyClient(intents=intents)
-client.run(TOKEN)
+bot = commands.Bot(command_prefix="/", description=DESCRIPTION, intents=intents)
+
+@bot.event
+async def on_ready():
+    print(f'Logged on as {bot.user}!')
+    for guild in PRIORITY_GUILDS:
+        g = discord.Object(id=guild)
+        bot.tree.copy_global_to(guild=g)
+        await bot.tree.sync(guild=g)
+    print("Commands synced")
+
+@bot.event
+async def on_message(message):
+    async with lock:
+        #ignore empty messages, bot's own messages, and NSFW channels
+        if (not message.content):
+            return
+        if (message.channel.nsfw):
+            return
+
+        if (message.guild.id not in histories):
+            histories[message.guild.id] = {"history": MessageHistory(enc, MAX_TOKENS), "bot" : GPT(MODEL, CONTEXT_MESSAGES, "constant", 1.3)}
+        history = histories[message.guild.id]['history']
+        gpt = histories[message.guild.id]['bot']
+
+        transformedMessage = msg_transformer.transform_message(message)
+
+        # we want the bot to record it's own messages
+        history.add(transformedMessage)
+        
+        if(message.author == bot.user):
+            return
+
+        # if the message mentions the bot, respond to it 
+        if (any(map(lambda x: x.id == BOT_ID, message.mentions))):
+            try:
+                response = gpt.get_response(message.author.id, history)['choices'][0]['message']['content']
+                response = msg_transformer.clear_bot_prefix(response, message.author)
+                response = response.replace("Schwembot:", "")
+                if (len(response) > MAX_MSG_LENGTH):
+                    response = response[:2000]
+                await message.channel.send(response, reference=message)
+            except Exception as e:
+                print("Error sending message: ", e)
+
+@bot.hybrid_command(
+    name="reload_name_map",
+    description="Reload name_mapping.json",
+)
+async def reload_name_map(ctx : commands.Context):
+    if not is_acro(ctx): return
+    msg_transformer.load_name_maps()
+    await ctx.reply("Name map reloaded.")
+
+@bot.hybrid_command(
+    name="clear_memory",
+    description="Clear bot memory",
+)
+async def clear_memory(ctx : commands.Context):
+    if not is_acro(ctx): return
+    try:
+        histories[ctx.guild.id]['history'].clear()
+        await ctx.reply("Memory cleared.")
+    except:
+        await ctx.reply("Memory failed to clear.")
+
+@bot.hybrid_command(
+    name="set_context",
+    description="Set the bot's context message",
+)
+async def clear_memory(ctx : commands.Context, message):
+    if not is_acro(ctx): return
+    try:
+        histories[ctx.guild.id]['bot'].extra_context = message
+        await ctx.reply("Context changed.")
+    except:
+        await ctx.reply("Failed to change context.")
+        
+@bot.hybrid_command(
+    name="set_temperature",
+    description="Set the bot's temperature function",
+)
+async def clear_memory(ctx : commands.Context, temperature_function, param_1, param_2=None, param_3=None, param_4=None, param_5=None):
+    if not is_acro(ctx): return
+    try:
+        histories[ctx.guild.id]['bot'].set_temp_function(temperature_function, param_1, param_2, param_3, param_4, param_5)
+        await ctx.reply("Changed temperature function.")
+    except Exception:
+        await ctx.reply("Failed to change temperature function.")
+
+def is_acro(ctx):
+    return ctx.author.id == ACRO_ID
+
+bot.run(TOKEN)

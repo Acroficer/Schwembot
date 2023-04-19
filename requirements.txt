@@ -2,3 +2,4 @@ openai
 discord
 tiktoken
 numpy
+discord-py-slash-command
