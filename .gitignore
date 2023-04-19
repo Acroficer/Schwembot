@@ -153,3 +153,4 @@ cython_debug/
 
 # name mapping
 name_mapping.json
+test.py
