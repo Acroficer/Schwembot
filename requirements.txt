@@ -1,5 +1,5 @@
 openai
-discord
+discordpy
 tiktoken
 numpy
 discord-py-slash-command
