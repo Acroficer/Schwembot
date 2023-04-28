@@ -55,7 +55,7 @@ async def on_message(message : discord.message):
         #ignore empty messages, bot's own messages, and NSFW channels
         if (not message.content):
             return
-        if (message.channel.nsfw):
+        if (not message.channel.is_nsfw):
             return
         if not channel_manager.check_allowed(message.channel):
             return
