@@ -153,4 +153,7 @@ cython_debug/
 
 # name mapping
 name_mapping.json
+# allowed channels
+channels.json
+
 test.py

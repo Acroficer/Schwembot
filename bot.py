@@ -4,6 +4,7 @@ import asyncio
 from message_history import MessageHistory
 from gpt import GPT
 from message_transformer import MessageTransformer
+from channel_manager import ChannelManager
 
 import discord
 from discord.ext import commands
@@ -31,6 +32,7 @@ openai.api_key = os.getenv("OPENAI_KEY")
 
 histories = {}
 msg_transformer = MessageTransformer(BOT_ID)
+channel_manager = ChannelManager()
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -54,6 +56,8 @@ async def on_message(message : discord.message):
         if (not message.content):
             return
         if (message.channel.nsfw):
+            return
+        if not channel_manager.check_allowed(message.channel):
             return
 
         if (message.guild.id not in histories):
@@ -126,6 +130,24 @@ async def clear_memory(ctx : commands.Context, temperature_function, param_1, pa
         await ctx.reply("Changed temperature function.")
     except Exception:
         await ctx.reply("Failed to change temperature function.")
+
+@bot.hybrid_command(
+    name="allow_channel",
+    description="Allow Schwembot to interact in this channel.",
+)
+async def allow_channel(ctx : commands.Context):
+    if not is_owner(ctx): return
+    channel_manager.add_channel(ctx.message.channel)
+    await ctx.reply("Added allowed channel.")
+
+@bot.hybrid_command(
+    name="disallow_channel",
+    description="Disallow Schwembot to interact in this channel.",
+)
+async def allow_channel(ctx : commands.Context):
+    if not is_owner(ctx): return
+    channel_manager.remove_channel(ctx.message.channel)
+    await ctx.reply("Removed allowed channel.")
 
 def is_owner(ctx):
     return ctx.author.id == OWNER_ID
