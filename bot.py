@@ -15,10 +15,15 @@ BOT_ID = 1097688082498719807
 MODEL = "gpt-3.5-turbo"
 MAX_TOKENS = 100
 MAX_MSG_LENGTH = 2000
-ACRO_ID = 111268204248080384
+OWNER_ID = None
 CONTEXT_MESSAGES = ["You are on a Discord server.", "You will receive messages from other users.", "Respond only to the last message."]
 DESCRIPTION="A GPT-powered Schwembot."
 PRIORITY_GUILDS = [225797665940701184, 965717715371307069,260872683909021697 ]
+
+try:
+    OWNER_ID = int(os.getenv("SCHWEMBOT_OWNER_ID"))
+except:
+    print("Error reading owner ID. Owner commands disabled.")
 
 lock = asyncio.Lock()
 enc = tiktoken.encoding_for_model(MODEL)
@@ -81,7 +86,7 @@ async def on_message(message):
     description="Reload name_mapping.json",
 )
 async def reload_name_map(ctx : commands.Context):
-    if not is_acro(ctx): return
+    if not is_owner(ctx): return
     msg_transformer.load_name_maps()
     await ctx.reply("Name map reloaded.")
 
@@ -90,7 +95,7 @@ async def reload_name_map(ctx : commands.Context):
     description="Clear bot memory",
 )
 async def clear_memory(ctx : commands.Context):
-    if not is_acro(ctx): return
+    if not is_owner(ctx): return
     try:
         histories[ctx.guild.id]['history'].clear()
         await ctx.reply("Memory cleared.")
@@ -102,7 +107,7 @@ async def clear_memory(ctx : commands.Context):
     description="Set the bot's context message",
 )
 async def clear_memory(ctx : commands.Context, message):
-    if not is_acro(ctx): return
+    if not is_owner(ctx): return
     try:
         histories[ctx.guild.id]['bot'].extra_context = message
         await ctx.reply("Context changed.")
@@ -114,14 +119,14 @@ async def clear_memory(ctx : commands.Context, message):
     description="Set the bot's temperature function",
 )
 async def clear_memory(ctx : commands.Context, temperature_function, param_1, param_2=None, param_3=None, param_4=None, param_5=None):
-    if not is_acro(ctx): return
+    if not is_owner(ctx): return
     try:
         histories[ctx.guild.id]['bot'].set_temp_function(temperature_function, param_1, param_2, param_3, param_4, param_5)
         await ctx.reply("Changed temperature function.")
     except Exception:
         await ctx.reply("Failed to change temperature function.")
 
-def is_acro(ctx):
-    return ctx.author.id == ACRO_ID
+def is_owner(ctx):
+    return ctx.author.id == OWNER_ID
 
 bot.run(TOKEN)
