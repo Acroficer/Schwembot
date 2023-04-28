@@ -48,7 +48,7 @@ async def on_ready():
     print("Commands synced")
 
 @bot.event
-async def on_message(message):
+async def on_message(message : discord.message):
     async with lock:
         #ignore empty messages, bot's own messages, and NSFW channels
         if (not message.content):
@@ -72,12 +72,13 @@ async def on_message(message):
         # if the message mentions the bot, respond to it 
         if (any(map(lambda x: x.id == BOT_ID, message.mentions))):
             try:
-                response = gpt.get_response(message.author.id, history)['choices'][0]['message']['content']
-                response = msg_transformer.clear_bot_prefix(response, message.author)
-                response = response.replace("Schwembot:", "")
-                if (len(response) > MAX_MSG_LENGTH):
-                    response = response[:2000]
-                await message.channel.send(response, reference=message)
+                async with message.channel.typing():
+                    response = gpt.get_response(message.author.id, history)['choices'][0]['message']['content']
+                    response = msg_transformer.clear_bot_prefix(response, message.author)
+                    response = response.replace("Schwembot:", "")
+                    if (len(response) > MAX_MSG_LENGTH):
+                        response = response[:2000]
+                    await message.channel.send(response, reference=message)
             except Exception as e:
                 print("Error sending message: ", e)
 
