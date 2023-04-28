@@ -19,7 +19,10 @@ MAX_MSG_LENGTH = 2000
 OWNER_ID = None
 CONTEXT_MESSAGES = ["You are on a Discord server.", "You will receive messages from other users.", "Respond only to the last message."]
 DESCRIPTION="A GPT-powered Schwembot."
-PRIORITY_GUILDS = [225797665940701184, 965717715371307069,260872683909021697 ]
+PRIORITY_GUILDS = [225797665940701184, 965717715371307069,260872683909021697, 1101324510046736504 ]
+text_channel_converter = commands.TextChannelConverter()
+forum_channel_converter = commands.ForumChannelConverter()
+thread_channel_converter = commands.ThreadConverter()
 
 try:
     OWNER_ID = int(os.getenv("SCHWEMBOT_OWNER_ID"))
@@ -135,19 +138,45 @@ async def clear_memory(ctx : commands.Context, temperature_function, param_1, pa
     name="allow_channel",
     description="Allow Schwembot to interact in this channel.",
 )
-async def allow_channel(ctx : commands.Context):
+async def allow_channel(ctx : commands.Context, channel = None):
     if not is_owner(ctx): return
-    channel_manager.add_channel(ctx.message.channel)
-    await ctx.reply("Added allowed channel.")
+    try:
+        if channel:
+            channel = channel.replace('<#', '').replace('>', '')
+            channelConverts = [text_channel_converter.convert, forum_channel_converter.convert, thread_channel_converter.convert]
+            for converter in channelConverts:
+                try:
+                    channel = await converter(ctx, channel)
+                    break
+                except: pass
+        else:
+            channel = ctx.channel
+        channel_manager.add_channel(channel)
+        await ctx.reply("Added allowed channel.")
+    except:
+        await ctx.reply("Failed to allow")
 
 @bot.hybrid_command(
     name="disallow_channel",
     description="Disallow Schwembot to interact in this channel.",
 )
-async def allow_channel(ctx : commands.Context):
+async def allow_channel(ctx : commands.Context, channel = None):
     if not is_owner(ctx): return
-    channel_manager.remove_channel(ctx.message.channel)
-    await ctx.reply("Removed allowed channel.")
+    try:
+        if channel:
+            channel = channel.replace('<#', '').replace('>', '')
+            channelConverts = [text_channel_converter.convert, forum_channel_converter.convert, thread_channel_converter.convert]
+            for converter in channelConverts:
+                try:
+                    channel = await converter(ctx, channel)
+                    break
+                except: pass
+        else:
+            channel = ctx.channel
+        channel_manager.remove_channel(channel)
+        await ctx.reply("Removed allowed channel.")
+    except:
+        await ctx.reply("Failed to remove")
 
 def is_owner(ctx):
     return ctx.author.id == OWNER_ID
