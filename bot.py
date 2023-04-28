@@ -7,7 +7,6 @@ from message_transformer import MessageTransformer
 
 import discord
 from discord.ext import commands
-from discord import app_commands
 import tiktoken
 import openai
 
