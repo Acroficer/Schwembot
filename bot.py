@@ -19,7 +19,7 @@ MAX_MSG_LENGTH = 2000
 OWNER_ID = None
 CONTEXT_MESSAGES = ["You are on a Discord server.", "You will receive messages from other users.", "Respond only to the last message."]
 DESCRIPTION="A GPT-powered Schwembot."
-PRIORITY_GUILDS = [225797665940701184, 965717715371307069,260872683909021697, 1101324510046736504 ]
+PRIORITY_GUILDS = [225797665940701184, 965717715371307069,260872683909021697, 1101324510046736504, 1100549559026995281 ]
 text_channel_converter = commands.TextChannelConverter()
 forum_channel_converter = commands.ForumChannelConverter()
 thread_channel_converter = commands.ThreadConverter()
@@ -96,7 +96,7 @@ async def on_message(message : discord.message):
 async def reload_name_map(ctx : commands.Context):
     if not is_owner(ctx): return
     msg_transformer.load_name_maps()
-    await ctx.reply("Name map reloaded.")
+    await ctx.reply("Name map reloaded.", ephemeral=True)
 
 @bot.hybrid_command(
     name="clear_memory",
@@ -106,9 +106,9 @@ async def clear_memory(ctx : commands.Context):
     if not is_owner(ctx): return
     try:
         histories[ctx.guild.id]['history'].clear()
-        await ctx.reply("Memory cleared.")
+        await ctx.reply("Memory cleared.", ephemeral=True)
     except:
-        await ctx.reply("Memory failed to clear.")
+        await ctx.reply("Memory failed to clear.", ephemeral=True)
 
 @bot.hybrid_command(
     name="set_context",
@@ -118,9 +118,9 @@ async def clear_memory(ctx : commands.Context, message):
     if not is_owner(ctx): return
     try:
         histories[ctx.guild.id]['bot'].extra_context = message
-        await ctx.reply("Context changed.")
+        await ctx.reply("Context changed.", ephemeral=True)
     except:
-        await ctx.reply("Failed to change context.")
+        await ctx.reply("Failed to change context.", ephemeral=True)
         
 @bot.hybrid_command(
     name="set_temperature",
@@ -130,9 +130,9 @@ async def clear_memory(ctx : commands.Context, temperature_function, param_1, pa
     if not is_owner(ctx): return
     try:
         histories[ctx.guild.id]['bot'].set_temp_function(temperature_function, param_1, param_2, param_3, param_4, param_5)
-        await ctx.reply("Changed temperature function.")
+        await ctx.reply("Changed temperature function.", ephemeral=True)
     except Exception:
-        await ctx.reply("Failed to change temperature function.")
+        await ctx.reply("Failed to change temperature function.", ephemeral=True)
 
 @bot.hybrid_command(
     name="allow_channel",
@@ -152,9 +152,9 @@ async def allow_channel(ctx : commands.Context, channel = None):
         else:
             channel = ctx.channel
         channel_manager.add_channel(channel)
-        await ctx.reply("Added allowed channel.")
+        await ctx.reply("Added allowed channel.", ephemeral=True)
     except:
-        await ctx.reply("Failed to allow")
+        await ctx.reply("Failed to allow", ephemeral=True)
 
 @bot.hybrid_command(
     name="disallow_channel",
@@ -174,9 +174,9 @@ async def allow_channel(ctx : commands.Context, channel = None):
         else:
             channel = ctx.channel
         channel_manager.remove_channel(channel)
-        await ctx.reply("Removed allowed channel.")
+        await ctx.reply("Removed allowed channel.", ephemeral=True)
     except:
-        await ctx.reply("Failed to remove")
+        await ctx.reply("Failed to remove", ephemeral=True)
 
 def is_owner(ctx):
     return ctx.author.id == OWNER_ID
